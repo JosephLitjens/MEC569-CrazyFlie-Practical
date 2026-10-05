@@ -18,7 +18,6 @@ HEIGHT = 0.3             # m, working height
 SPEED = 0.2              # m/s, horizontal speed
 CLIMB_SPEED = 0.2        # m/s, takeoff speed in z
 LAND_SPEED = 1.0         # m/s, landing speed in z (fast, so the drone barely moves sideways on the way down)
-CORRECTION_SPEED = 0.1   # m/s, speed of the second, correcting pass in fly_to (slower, so it coasts less)
 SETTLE_TIME = 1.0        # s, hover after a move so the drone stops drifting before we read its position
 REACHED_TOL = 0.025       # m, how close the drone must be to the target to count as arrived (in real life, the drone will never reach an exact position)
 
@@ -32,7 +31,7 @@ PAD_SEARCH_Y = 1.0       # m, size of the search area along y
 HOME_SEARCH = 0.4        # m, on the way back, search this far each way around where the takeoff pad should be
 MAX_LANE_SPACING = 0.1  # m, largest allowed gap between lanes (keep it smaller than the box)
 BOX_DIP = 0.04           # m, a down reading this far below the floor = "over the box"
-LOG_PERIOD = 0.04        # s between log samples
+LOG_PERIOD = 0.04        # s between log samples 
 EMPTY_LANES_TO_STOP = 2  # after the box is seen, stop after this many lanes with no box
 
 # Obstacle avoidance settings
@@ -40,7 +39,7 @@ EMPTY_LANES_TO_STOP = 2  # after the box is seen, stop after this many lanes wit
 # If something is ahead, it slides sideways until the way ahead is clear (plus a margin), then carries on forward.
 SAFE_DIST = 0.25         # m, an obstacle closer than this ahead triggers a sidestep
 CLEAR_DIST = SAFE_DIST + 0.10    # m, "clear again" distance (the gap stops flickering)
-DRONE_HITBOX = 0.07       # m, keep sliding this far after the way ahead clears
+DRONE_HITBOX = 0.1       # m, keep sliding this far (divided by 2) after the way ahead clears to make sure you pass the obstacle
 FAR = 4.0               # m, distance used for "nothing in range / invalid reading"; from crazyflie spec
 
 # Radio address of the drone
@@ -59,7 +58,7 @@ LOG_VARS = [
 ('stateEstimate.x', 'float',    'x_m'),
 ('stateEstimate.y', 'float',    'y_m'),
 ('stateEstimate.z', 'float',    'z_m'),
-('range.zrange',    'uint16_t', 'down_mm')]    # down sensor - very important
+('range.zrange',    'uint16_t', 'down_mm')]    # down sensor (very important for box detection)
 
 # Position (column) of each value in a log row (matches above)
 FRONT_COL = 0
@@ -76,7 +75,7 @@ DOWN_COL = 8
 # Note: The drone MUST be connected first
 def start_logging(scf, rows): 
     #setup the log configuration 
-    lg = LogConfig(name='Mission', period_in_ms=int(LOG_PERIOD * 1000))    #define samples per second (hz) found as 1/period
+    lg = LogConfig(name='Mission', period_in_ms=int(LOG_PERIOD * 1000))  #define samples per second (hz) found as 1/period (in ms)
     for var, var_type, _ in LOG_VARS: #We are just taking our earlier setup of the log variables and using those (ignoring the header name via _)
         lg.add_variable(var, var_type) #tell the drone to log these specific variables (with types defined)
 
@@ -99,8 +98,8 @@ def get_position(rows): #reads the most recent position data from the log and ou
     row = rows[-1] #fetch the most recent data
     return np.array([row[X_COL], row[Y_COL], row[Z_COL]]) #extract xyz and return as array
 
-def save_log(rows): #Function to save the log, used at the end of the main loop
-    os.makedirs('logs', exist_ok=True) #
+def save_log(rows): #Function to save the log, used at the end of the main loop. Self explanatory
+    os.makedirs('logs', exist_ok=True) 
     name = dt.datetime.now().strftime('%Y_%m_%d_%H_%M_%S.csv')
     header = ','.join(col for _, _, col in LOG_VARS)
     np.savetxt(os.path.join('logs', name), np.array(rows), delimiter=',', header=header, comments='')
@@ -118,12 +117,12 @@ def fly_to(mc, rows, x, y):
     def get_dist_m(axis, sign): #we send the direction as the arg and receive the obstacle distance in meters
         #axis: 0 is x and 1 is y. sign: 1 is positive and -1 is negative. Ex: axis 0, sign 1 is the positive x direction (front sensor)
         if axis == 0:
-            col = FRONT_COL if sign > 0 else BACK_COL
+            col = FRONT_COL if sign > 0 else BACK_COL #look front or back if motion is in x axis
         else:
-            col = LEFT_COL if sign > 0 else RIGHT_COL
-        d = rows[-1][col] / 1000.0
+            col = LEFT_COL if sign > 0 else RIGHT_COL #look R/L for motion in y axis
+        d = rows[-1][col] / 1000.0 #select the most recent data point for the desired position data, and find in meters
         #we will assume that if the reading is <= 0 that the reading is invalid and means the sensor is essentially free in that direction (thus "FAR")
-        return d if d > 0.0 else FAR
+        return d if d > 0.0 else FAR #if real data is retrieved give back the data
 
     def set_speed(axis, axis_vel): #command the drone to move with a specified velocity in the xy plane
         #drone will move with specified velocity until told otherwise (either via a new call of this function or mc.stop())
