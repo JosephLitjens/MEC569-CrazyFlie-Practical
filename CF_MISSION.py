@@ -113,7 +113,6 @@ def fly_to(mc, rows, x, y):
 #If it encounters an obstacle along the x direction, it will sidestep in the y direction until the x direction is clear. 
 # It repeats until the x position is reached. Then it does the same process for the y direction. 
 # It iterates until the final position is reached within tolerance
-    target = [x, y] #set the goal array
 
 # ------ HELPER FUNCTIONS FOR fly_to() ---------
     def get_dist_m(axis, sign): #we send the direction as the arg and receive the obstacle distance in meters
@@ -156,11 +155,13 @@ def fly_to(mc, rows, x, y):
             if abs(err) < REACHED_TOL:
                 break
             sign = 1 if err > 0 else -1 #if error is positive we are behind the target so move "forward"; if negative we need to reverse direction
-            if get_dist_m(axis, sign) < SAFE_DIST: #if an obstacle is found in the motion direction (within the threshold), perform the sidestep
+            if get_dist_m(axis, sign)  < SAFE_DIST or get_dist_m(abs(axis-1), 1)  < SAFE_DIST or get_dist_m(abs(axis-1), -1) < SAFE_DIST: #if an obstacle is found in the motion direction, or to the side (within the threshold), perform the sidestep
                 sidestep(axis, sign)
             else:
                 set_speed(axis, sign * axis_vel) #otherwise, move towards the target along the direction of interest
             time.sleep(CONTROL_DT)
+
+    target = [x, y] #set the goal coords in an array
 
     #Move to defined target point while avoiding obstacles
     [x_read, y_read, _] =get_position(rows) #take initial reading
@@ -170,11 +171,10 @@ def fly_to(mc, rows, x, y):
         move_along(current_ax, SPEED) #move along desired axis, sidestepping obstacles along the way
         [x_read, y_read, _] =get_position(rows) #take pos again
         final_err=np.sqrt((x_read - x)**2 + (y_read - y)**2) #find error again
-        #change motion axis
-        if current_ax == 0:
-            current_ax = 1
-        else:
-            current_ax = 0
+        
+        #change motion axis by alternating between 0 and 1
+        current_ax=abs(current_ax-1)
+
         #repeat alternating between x and y motions until target is reached
     mc.stop()    # hover command (once position is reached)
     time.sleep(SETTLE_TIME) #allow drone to settle
