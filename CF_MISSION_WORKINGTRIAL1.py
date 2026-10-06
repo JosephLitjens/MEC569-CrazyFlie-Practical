@@ -185,8 +185,8 @@ def land(mc):
     mc.land(DESCENT_SPEED) #use motion commander to land, with specified descent speed
 
 ## SEARCH ALGORITHM --- MAIN CHALLENGE
-#this function takes inputs of the log (which is constantly updating) and the desired range of the search region
-# It performs a "lawn mower" pattern motion as the search pattern
+#this function takes inputs of the log object (which is constantly updating) and the desired range of the search region
+# It performs a zigzag/raster scan as the search pattern
 # During the motion it collects the log data of the xy locations of the points where a box edge is detected with the height sensor
 # The centroid of the detected box edge points is found and returned as the box center position
 # If the box is found, the search ends without completing fully in order to save time (for battery life)
